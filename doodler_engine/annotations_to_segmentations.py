@@ -297,10 +297,10 @@ def fromhex(n):
 def label_to_colors(
     img,
     mask,
-    alpha,#=128,
-    colormap,#=class_label_colormap, #px.colors.qualitative.G10,
-    color_class_offset,#=0,
-    do_alpha,#=True
+    alpha,
+    colormap,
+    color_class_offset,
+    do_alpha,
 ):
     """
     Take MxN matrix containing integers representing labels and return an MxNx4
@@ -398,9 +398,9 @@ def compute_segmentations(
     logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
     logging.info('Calling segmentation function')
 
-    seg = segmentation(img, #img_path, results_folder, callback_context, 
+    seg = segmentation(img, mask,#img_path, results_folder, callback_context, 
                        crf_theta_slider_value, crf_mu_slider_value,  rf_downsample_value, #median_filter_value,
-                       crf_downsample_factor, mask, n_sigmas, multichannel, intensity, edges, texture, #gt_prob, 
+                       crf_downsample_factor, n_sigmas, multichannel, intensity, edges, texture, #gt_prob, 
                        sigma_min, sigma_max)
     logging.info('Segmentation computed')
 

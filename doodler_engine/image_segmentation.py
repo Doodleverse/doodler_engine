@@ -447,12 +447,11 @@ def do_classify(img,mask,n_sigmas,multichannel,intensity,edges,texture,sigma_min
 
 # ##========================================================
 def segmentation(
-    img,
+    img, mask,
     crf_theta_slider_value,
     crf_mu_slider_value,
     rf_downsample_value,
     crf_downsample_factor,
-    mask,#=None,
     n_sigmas,
     multichannel,#=True,
     intensity,#=True,

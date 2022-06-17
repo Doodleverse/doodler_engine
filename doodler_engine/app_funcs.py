@@ -25,11 +25,6 @@
 
 from glob import glob
 
-try:
-    from dash import html
-except:
-    import dash_html_components as html
-
 import io, os, psutil, logging, base64, PIL.Image
 from .plot_utils import dummy_fig, add_layout_images_to_fig
 import zipfile
@@ -41,23 +36,6 @@ def get_asset_files():
     # Any image with 'dash' in the name is used for styling and is not data to be processed
     files = [f for f in files if 'dash' not in f]
     return files
-
-##========================================================
-def parse_contents(contents, filename, date):
-    return html.Div([
-        html.H5(filename),
-        html.H6(datetime.fromtimestamp(date)),
-
-        # HTML images accept base64 encoded strings in the same format
-        # that is supplied by the upload
-        html.Img(src=contents),
-        html.Hr(),
-        html.Div('Raw Content'),
-        html.Pre(contents[0:200] + '...', style={
-            'whiteSpace': 'pre-wrap',
-            'wordBreak': 'break-all'
-        })
-    ])
 
 ##========================================================
 def look_up_seg(d, key):
