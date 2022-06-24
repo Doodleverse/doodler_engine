@@ -26,7 +26,7 @@
 from glob import glob
 
 import io, os, psutil, logging, base64, PIL.Image
-from .plot_utils import dummy_fig, add_layout_images_to_fig
+# from .plot_utils import dummy_fig, add_layout_images_to_fig
 import zipfile
 
 ##========================================================
@@ -95,31 +95,31 @@ def uploaded_files(filelist,UPLOAD_DIRECTORY,LABELED_DIRECTORY):
     return sorted(files), sorted(labeled_files)
 
 
-##========================================================
-def make_and_return_default_figure(
-    images,#=[DEFAULT_IMAGE_PATH],
-    stroke_color,#=convert_integer_class_to_color(class_label_colormap,DEFAULT_LABEL_CLASS),
-    pen_width,#=DEFAULT_PEN_WIDTH,
-    shapes#=[],
-):
-    """
-    create and return the default Dash/plotly figure object
-    """
-    fig = dummy_fig() #plot_utils.
+# ##========================================================
+# def make_and_return_default_figure(
+#     images,#=[DEFAULT_IMAGE_PATH],
+#     stroke_color,#=convert_integer_class_to_color(class_label_colormap,DEFAULT_LABEL_CLASS),
+#     pen_width,#=DEFAULT_PEN_WIDTH,
+#     shapes#=[],
+# ):
+#     """
+#     create and return the default Dash/plotly figure object
+#     """
+#     fig = dummy_fig() #plot_utils.
 
-    add_layout_images_to_fig(fig, images) #plot_utils.
+#     add_layout_images_to_fig(fig, images) #plot_utils.
 
-    fig.update_layout(
-        {
-            "dragmode": "drawopenpath",
-            "shapes": shapes,
-            "newshape.line.color": stroke_color,
-            "newshape.line.width": pen_width,
-            "margin": dict(l=0, r=0, b=0, t=0, pad=4),
-            "height": 650
-        }
-    )
+#     fig.update_layout(
+#         {
+#             "dragmode": "drawopenpath",
+#             "shapes": shapes,
+#             "newshape.line.color": stroke_color,
+#             "newshape.line.width": pen_width,
+#             "margin": dict(l=0, r=0, b=0, t=0, pad=4),
+#             "height": 650
+#         }
+#     )
 
-    return fig
+#     return fig
 
 #

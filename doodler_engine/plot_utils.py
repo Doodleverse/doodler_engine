@@ -27,21 +27,21 @@
 ## ``````````````````````````` imports
 ##========================================================
 import PIL.Image
-import plotly.graph_objects as go
-# import skimage.util
-from plotly.utils import ImageUriValidator
+# import plotly.graph_objects as go
+# # import skimage.util
+# from plotly.utils import ImageUriValidator
 from PIL import ExifTags
 
-##========================================================
-def dummy_fig():
-    """ create a dummy figure to be later modified """
-    fig = go.Figure(go.Scatter(x=[], y=[]))
-    fig.update_layout(template=None)
-    fig.update_xaxes(showgrid=False, showticklabels=False, zeroline=False)
-    fig.update_yaxes(
-        showgrid=False, scaleanchor="x", showticklabels=False, zeroline=False
-    )
-    return fig
+# ##========================================================
+# def dummy_fig():
+#     """ create a dummy figure to be later modified """
+#     fig = go.Figure(go.Scatter(x=[], y=[]))
+#     fig.update_layout(template=None)
+#     fig.update_xaxes(showgrid=False, showticklabels=False, zeroline=False)
+#     fig.update_yaxes(
+#         showgrid=False, scaleanchor="x", showticklabels=False, zeroline=False
+#     )
+#     return fig
 
 ##========================================================
 def pilim(im):
@@ -119,7 +119,7 @@ def add_layout_images_to_fig(fig,
     return fig
 
 
-##========================================================
-def pil2uri(img):
-    """ conevrts PIL image to uri"""
-    return ImageUriValidator.pil_image_to_uri(img)
+# ##========================================================
+# def pil2uri(img):
+#     """ conevrts PIL image to uri"""
+#     return ImageUriValidator.pil_image_to_uri(img)

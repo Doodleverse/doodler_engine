@@ -35,7 +35,7 @@ from PIL import ExifTags
 import io, os, psutil, logging, base64, json
 from datetime import datetime
 from .image_segmentation import segmentation
-import plotly.express as px
+# import plotly.express as px
 from skimage.io import imsave, imread
 from cairosvg import svg2png
 from datetime import datetime
@@ -404,8 +404,11 @@ def compute_segmentations(
                        sigma_min, sigma_max)
     logging.info('Segmentation computed')
 
-    seg = check_sanity(seg,mask)
-    logging.info('Segmentation sanity checked')
+    try:
+        seg = check_sanity(seg,mask)
+        logging.info('Segmentation sanity checked')
+    except:
+        logging.info('Segmentation sanity check failed (cause unknown) - label unmodified')
 
     #print(np.unique(seg))
     if np.ndim(img)==3:
