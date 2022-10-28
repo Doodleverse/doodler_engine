@@ -558,8 +558,8 @@ def segmentation(
     if len(np.unique(mask)[1:])==1:
 
         logging.info('Only one class annotation provided, skipping RF and CRF and coding all pixels %i' % (np.unique(mask)[1:]))
-        result2 = np.ones(mask.shape[:2])*np.unique(mask)[1:]
-        result2 = result2.astype(np.uint8)
+        crf_result = np.ones(mask.shape[:2])*np.unique(mask)[1:]
+        crf_result = crf_result.astype(np.uint8)
 
     else:
 
