@@ -3,7 +3,7 @@
 #
 # MIT License
 #
-# Copyright (c) 2020-2021, Marda Science LLC
+# Copyright (c) 2020-2022, Marda Science LLC
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -179,7 +179,7 @@ def crf_refine_from_integer_labels(label,
 
     # result = rescale(result, orig_mn, orig_mx).astype(np.uint8)
 
-    logging.info('label resized and rescaled ... CRF post-processing complete')
+    logging.info('label resized and rescaled ... CRF from labels post-processing complete')
 
     return result, l_unique
 
@@ -259,7 +259,7 @@ def crf_refine(label,
 
     # result = rescale(result, orig_mn, orig_mx).astype(np.uint8)
 
-    logging.info('label resized and rescaled ... CRF post-processing complete')
+    logging.info('label resized and rescaled ... CRF from softmax post-processing complete')
 
     return result, l_unique
 
@@ -438,7 +438,8 @@ def do_classify(img,mask,n_sigmas,multichannel,intensity,edges,texture,sigma_min
     Apply classifier to features to extract unary potentials for the CRF
     """
 
-    print('MLP ...')
+    # print('MLP ...')
+    logging.info('Extracting features for MLP classifier')
 
     if np.ndim(img)==3:
         features = extract_features(
@@ -463,6 +464,7 @@ def do_classify(img,mask,n_sigmas,multichannel,intensity,edges,texture,sigma_min
             sigma_max=sigma_max,
         )
 
+    logging.info('features extracted for MLP classifier')
 
     if mask is None:
         raise ValueError("If no classifier clf is passed, you must specify a mask.")
@@ -557,21 +559,12 @@ def segmentation(
 
     if len(np.unique(mask)[1:])==1:
 
-        logging.info('Only one class annotation provided, skipping RF and CRF and coding all pixels %i' % (np.unique(mask)[1:]))
+        logging.info('Only one class annotation provided, skipping MLP and CRF and coding all pixels %i' % (np.unique(mask)[1:]))
         crf_result = np.ones(mask.shape[:2])*np.unique(mask)[1:]
         crf_result = crf_result.astype(np.uint8)
+        logging.info('label creation complete')
 
     else:
-
-        # result, unique_labels = do_classify(img,mask,n_sigmas,
-        #                                     multichannel,intensity,edges,
-        #                                     texture, sigma_min,sigma_max, rf_downsample_value)
-
-        # n=len(unique_labels)
-        # result = result.reshape(img.shape[0],img.shape[1],len(unique_labels))
-        # # print(result.shape)
-        # match = np.unique(np.argmax(result,-1))
-
 
         #================================
         # MLP analysis
@@ -580,7 +573,10 @@ def segmentation(
         mlp_result, unique_labels = do_classify(img,mask,n, #n_sigmas,
                                                 multichannel,intensity,edges,
                                                 texture, sigma_min,sigma_max, rf_downsample_value)
-        
+
+        logging.info('MLP model applied with sigma range %f : %f' % (sigma_min,sigma_max))
+        logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
+
         mlp_result = mlp_result.reshape(img.shape[0],img.shape[1],len(unique_labels))
 
         mlp_result = np.argmax(mlp_result,-1)+1
@@ -593,9 +589,7 @@ def segmentation(
 
         mlp_result = mlp_result2.copy()-1
         # print(np.unique(mlp_result))
-
-        logging.info('MLP model applied with sigma range %f : %f' % (sigma_min,sigma_max))
-        logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
+        logging.info('MLP result recoded to set of classes present in the doodles')
 
         # make a limited one-hot array and add the available bands
         nx, ny = mlp_result.shape
@@ -604,18 +598,22 @@ def segmentation(
 
         # if not np.all(uniq_doodles-1==np.unique(np.argmax(mlp_result_softmax,-1))):
         if not n==len(np.unique(np.argmax(mlp_result_softmax,-1))):
-            print("MLP failed")
+            logging.info('MLP method failed')
 
             try:
-                print('CRF ...')
+                logging.info('CRF from original doodles being computed')                
                 crf_result, n = crf_refine_from_integer_labels(mask, img, n,
                                                                 crf_theta_slider_value, crf_mu_slider_value, 
                                                                 crf_downsample_factor)
+
+                logging.info('CRF model applied with theta=%f and mu=%f' % ( crf_theta_slider_value, crf_mu_slider_value))
+                logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
                 uniq_crf = np.unique(crf_result)
                 crf_result2 = np.zeros_like(crf_result)
                 for o,e in zip(uniq_doodles,uniq_crf):
                     crf_result2[crf_result==e] = o
+                logging.info('CRF result recoded to set of classes present in the doodles')
 
                 crf_result = crf_result2.copy()-1
 
@@ -624,8 +622,9 @@ def segmentation(
         else:
             #================================
             # CRF analysis
-            print('CRF ...')
+            # print('CRF ...')
             try:
+                logging.info('CRF from MLP softmax scores being computed')                
                 crf_result, _ = crf_refine(mlp_result_softmax, img, n,
                                         crf_theta_slider_value, crf_mu_slider_value,
                                         crf_downsample_factor)
@@ -636,15 +635,21 @@ def segmentation(
                     crf_result2[crf_result==e] = o
 
                 crf_result = crf_result2.copy()-1
+                logging.info('CRF result recoded to set of classes present in the doodles')
 
                 # if not np.all(uniq_doodles-1==np.unique(crf_result)):
                 if not len(uniq_doodles)==len(np.unique(crf_result)):
 
-                    print("CRF failed")
+                    # print("CRF failed")
+                    logging.info('CRF from MLP softmax scores failed')
+                    logging.info('CRF from original integer doodles being computed')
 
                     crf_result, _ = crf_refine_from_integer_labels(mask, img, n,
                                                                     crf_theta_slider_value, crf_mu_slider_value, 
                                                                     crf_downsample_factor)
+
+                    logging.info('CRF model applied with theta=%f and mu=%f' % ( crf_theta_slider_value, crf_mu_slider_value))
+                    logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
                     uniq_crf = np.unique(crf_result)
                     crf_result2 = np.zeros_like(crf_result)
@@ -652,9 +657,13 @@ def segmentation(
                         crf_result2[crf_result==e] = o
 
                     crf_result = crf_result2.copy()-1
+                    logging.info('CRF result recoded to set of classes present in the doodles')
 
             except:
                 crf_result = mlp_result.copy()
+
+
+    return crf_result
 
             # result2, n = crf_refine(result, img, n,
             #                         crf_theta_slider_value, crf_mu_slider_value, 
@@ -679,10 +688,7 @@ def segmentation(
 
         # print(np.unique(crf_result))
 
-        logging.info('Weighted average applied to test-time augmented outputs')
-
-        logging.info('CRF model applied with theta=%f and mu=%f' % ( crf_theta_slider_value, crf_mu_slider_value))
-        logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
+        # logging.info('Weighted average applied to test-time augmented outputs')
 
         # if ((n==1)):
         #     crf_result[mlp_result>0] = np.unique(mlp_result)
@@ -694,9 +700,15 @@ def segmentation(
         # for k in np.setdiff1d(np.unique(result2), unique_labels):
         #     result2[result2==k]=0
 
-        logging.info('Spatially filtered values inpainted')
-        logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
+        # logging.info('Spatially filtered values inpainted')
+        # logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
-    return crf_result
+        # result, unique_labels = do_classify(img,mask,n_sigmas,
+        #                                     multichannel,intensity,edges,
+        #                                     texture, sigma_min,sigma_max, rf_downsample_value)
 
+        # n=len(unique_labels)
+        # result = result.reshape(img.shape[0],img.shape[1],len(unique_labels))
+        # # print(result.shape)
+        # match = np.unique(np.argmax(result,-1))
 
