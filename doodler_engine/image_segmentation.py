@@ -39,8 +39,7 @@ from scipy.signal import convolve2d
 
 #crf
 import pydensecrf.densecrf as dcrf
-from pydensecrf.utils import create_pairwise_bilateral, unary_from_softmax
-# unary_from_labels, 
+from pydensecrf.utils import create_pairwise_bilateral, unary_from_softmax, unary_from_labels
 
 #utility
 from tempfile import TemporaryFile
@@ -103,6 +102,86 @@ def inpaint_nans(im):
         nans = np.isnan(im)
     return im
 
+
+##========================================================
+def crf_refine_from_integer_labels(label,
+    img,n,
+    crf_theta_slider_value,
+    crf_mu_slider_value,
+    crf_downsample_factor): #gt_prob
+    """
+    "crf_refine(label, img)"
+    This function refines a label image based on an input label image and the associated image
+    Uses a conditional random field algorithm using spatial and image features
+    INPUTS:
+        * label [ndarray]: label image 2D matrix of integers
+        * image [ndarray]: image 3D matrix of integers
+    OPTIONAL INPUTS: None
+    GLOBAL INPUTS: None
+    OUTPUTS: label [ndarray]: label image 2D matrix of integers
+    """
+
+    Horig = img.shape[0]
+    Worig = img.shape[1]
+    l_unique = len(np.unique(label)) #label.shape[-1]
+
+    # label = label.reshape(Horig,Worig,l_unique)
+
+    scale = 1+(5 * (np.array(img.shape).max() / 3000))
+    logging.info('CRF scale: %f' % (scale))
+
+    logging.info('CRF downsample factor: %f' % (crf_downsample_factor))
+    logging.info('CRF theta parameter: %f' % (crf_theta_slider_value))
+    logging.info('CRF mu parameter: %f' % (crf_mu_slider_value))
+
+    # decimate by factor by taking only every other row and column
+    img = img[::crf_downsample_factor,::crf_downsample_factor, :]
+    # do the same for the label image
+    label = label[::crf_downsample_factor,::crf_downsample_factor]
+    # yes, I know this aliases, but considering the task, it is ok; the objective is to
+    # make fast inference and resize the output
+
+    logging.info('Images downsampled by a factor of %f' % (crf_downsample_factor))
+
+    H = img.shape[0]
+    W = img.shape[1]
+    U = unary_from_labels(label.astype('int'), n, gt_prob=0.51) #np.argmax(label,-1)
+    d = dcrf.DenseCRF2D(H, W, n)
+
+    # U = unary_from_softmax(np.ascontiguousarray(np.rollaxis(label,-1,0)))
+    # d = dcrf.DenseCRF2D(H, W, l_unique)
+
+    d.setUnaryEnergy(U)
+
+    # to add the color-independent term, where features are the locations only:
+    d.addPairwiseGaussian(sxy=(3, 3),
+                 compat=3,
+                 kernel=dcrf.DIAG_KERNEL,
+                 normalization=dcrf.NORMALIZE_SYMMETRIC)
+    feats = create_pairwise_bilateral(
+                          sdims=(crf_theta_slider_value, crf_theta_slider_value),
+                          schan=(scale,scale,scale),
+                          img=img,
+                          chdim=2)
+
+    d.addPairwiseEnergy(feats, compat=crf_mu_slider_value, kernel=dcrf.DIAG_KERNEL,normalization=dcrf.NORMALIZE_SYMMETRIC) #260
+
+    logging.info('CRF feature extraction complete ... inference starting')
+
+    Q = d.inference(10)
+    result = np.argmax(Q, axis=0).reshape((H, W)).astype(np.uint8) +1
+    logging.info('CRF inference made')
+
+    # uniq = np.unique(result.flatten())
+
+    result = resize(result, (Horig, Worig), order=0, anti_aliasing=False) #True)
+    result = rescale(result, 1, l_unique).astype(np.uint8)
+
+    # result = rescale(result, orig_mn, orig_mx).astype(np.uint8)
+
+    logging.info('label resized and rescaled ... CRF post-processing complete')
+
+    return result, l_unique
 
 ##========================================================
 def crf_refine(label,
@@ -484,40 +563,133 @@ def segmentation(
 
     else:
 
-        result, unique_labels = do_classify(img,mask,n_sigmas,multichannel,intensity,edges,texture, sigma_min,sigma_max, rf_downsample_value)
-        n=len(unique_labels)
-        result = result.reshape(img.shape[0],img.shape[1],len(unique_labels))
-        # print(result.shape)
-        match = np.unique(np.argmax(result,-1))
+        # result, unique_labels = do_classify(img,mask,n_sigmas,
+        #                                     multichannel,intensity,edges,
+        #                                     texture, sigma_min,sigma_max, rf_downsample_value)
+
+        # n=len(unique_labels)
+        # result = result.reshape(img.shape[0],img.shape[1],len(unique_labels))
+        # # print(result.shape)
+        # match = np.unique(np.argmax(result,-1))
+
+
+        #================================
+        # MLP analysis
+        n=len(np.unique(mask)[1:])
+
+        mlp_result, unique_labels = do_classify(img,mask,n, #n_sigmas,
+                                                multichannel,intensity,edges,
+                                                texture, sigma_min,sigma_max, rf_downsample_value)
+        
+        mlp_result = mlp_result.reshape(img.shape[0],img.shape[1],len(unique_labels))
+
+        mlp_result = np.argmax(mlp_result,-1)+1
+
+        uniq_doodles = np.unique(mask)[1:]
+        uniq_mlp = np.unique(mlp_result)
+        mlp_result2 = np.zeros_like(mlp_result)
+        for o,e in zip(uniq_doodles,uniq_mlp):
+            mlp_result2[mlp_result==e] = o
+
+        mlp_result = mlp_result2.copy()-1
+        # print(np.unique(mlp_result))
 
         logging.info('MLP model applied with sigma range %f : %f' % (sigma_min,sigma_max))
         logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
-        print('CRF ...')
+        # make a limited one-hot array and add the available bands
+        nx, ny = mlp_result.shape
+        mlp_result_softmax = np.zeros((nx,ny,n))
+        mlp_result_softmax[:,:,:n] = (np.arange(n) == 1+mlp_result[...,None]-1).astype(int)
 
-        result2, n = crf_refine(result, img, n,crf_theta_slider_value, crf_mu_slider_value, crf_downsample_factor)#, gt_prob)
+        # if not np.all(uniq_doodles-1==np.unique(np.argmax(mlp_result_softmax,-1))):
+        if not n==len(np.unique(np.argmax(mlp_result_softmax,-1))):
+            print("MLP failed")
 
-        match2 = np.unique(result2-1)
-        # print(match2)
-        if not np.all(np.array(match)==np.array(match2)):
-            print("Problem with CRF solution.... reverting back to MLP solution")
-            result2 = result.copy()
+            try:
+                print('CRF ...')
+                crf_result, n = crf_refine_from_integer_labels(mask, img, n,
+                                                                crf_theta_slider_value, crf_mu_slider_value, 
+                                                                crf_downsample_factor)
+
+                uniq_crf = np.unique(crf_result)
+                crf_result2 = np.zeros_like(crf_result)
+                for o,e in zip(uniq_doodles,uniq_crf):
+                    crf_result2[crf_result==e] = o
+
+                crf_result = crf_result2.copy()-1
+
+            except:
+                crf_result = mlp_result.copy()
+        else:
+            #================================
+            # CRF analysis
+            print('CRF ...')
+            try:
+                crf_result, _ = crf_refine(mlp_result_softmax, img, n,
+                                        crf_theta_slider_value, crf_mu_slider_value,
+                                        crf_downsample_factor)
+
+                uniq_crf = np.unique(crf_result)
+                crf_result2 = np.zeros_like(crf_result)
+                for o,e in zip(uniq_doodles,uniq_crf):
+                    crf_result2[crf_result==e] = o
+
+                crf_result = crf_result2.copy()-1
+
+                # if not np.all(uniq_doodles-1==np.unique(crf_result)):
+                if not len(uniq_doodles)==len(np.unique(crf_result)):
+
+                    print("CRF failed")
+
+                    crf_result, _ = crf_refine_from_integer_labels(mask, img, n,
+                                                                    crf_theta_slider_value, crf_mu_slider_value, 
+                                                                    crf_downsample_factor)
+
+                    uniq_crf = np.unique(crf_result)
+                    crf_result2 = np.zeros_like(crf_result)
+                    for o,e in zip(uniq_doodles,uniq_crf):
+                        crf_result2[crf_result==e] = o
+
+                    crf_result = crf_result2.copy()-1
+
+            except:
+                crf_result = mlp_result.copy()
+
+            # result2, n = crf_refine(result, img, n,
+            #                         crf_theta_slider_value, crf_mu_slider_value, 
+            #                         crf_downsample_factor)#, gt_prob)
+
+            # match2 = np.unique(result2-1)
+            # # print(match2)
+            # if not np.all(np.array(match)==np.array(match2)):
+            #     print("MLP and CRF solutions are unmatched in terms of number of classes.... ")
+            #     print("Bypassing MLP and using doodles directly with a modified CRF .... ")
+
+            #     logging.info('MLP and CRF solutions are unmatched in terms of number of classes')
+            #     logging.info('Bypassing MLP and using doodles directly with a modified CRF')
+
+            #     result2, n = crf_refine_from_integer_labels(mask, img, n,
+            #                                                 crf_theta_slider_value, crf_mu_slider_value, 
+            #                                                 crf_downsample_factor)
 
         # # set to zero any labels not present in the original labels
         # for k in np.setdiff1d(np.unique(np.argmax(result),-1), unique_labels):
         #     result2[result2==k]=0
+
+        # print(np.unique(crf_result))
 
         logging.info('Weighted average applied to test-time augmented outputs')
 
         logging.info('CRF model applied with theta=%f and mu=%f' % ( crf_theta_slider_value, crf_mu_slider_value))
         logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
-        if ((n==1)):
-            result2[result>0] = np.unique(result)
+        # if ((n==1)):
+        #     crf_result[mlp_result>0] = np.unique(mlp_result)
 
-        result2 = result2.astype('float')
-        result2[result2==0] = np.nan
-        result2 = inpaint_nans(result2).astype('uint8')
+        # crf_result = crf_result.astype('float')
+        # crf_result[crf_result==0] = np.nan
+        # crf_result = inpaint_nans(crf_result).astype('uint8')
 
         # for k in np.setdiff1d(np.unique(result2), unique_labels):
         #     result2[result2==k]=0
@@ -525,6 +697,6 @@ def segmentation(
         logging.info('Spatially filtered values inpainted')
         logging.info('percent RAM usage: %f' % (psutil.virtual_memory()[2]))
 
-    return result2
+    return crf_result
 
 
