@@ -1,5 +1,0 @@
-include versioneer.py
-include doodler_engine/_version.py
-include README.rst
-include LICENSE
-include requirements.txt

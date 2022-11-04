@@ -1,1 +1,9 @@
-versioneer
+numpy >=1.19
+pillow >=7.1.2
+scikit-image >=0.16.2
+scikit-learn >=0.23
+scipy >=1.4.1
+psutil
+cairosvg
+pydensecrf
+joblib

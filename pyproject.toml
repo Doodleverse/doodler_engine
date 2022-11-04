@@ -1,0 +1,31 @@
+
+[build-system]
+requires = ["setuptools>=61.0", "setuptools-git-versioning<2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "doodler-engine"
+description = "Imports into Dash-Doodler and Holo-Doodler labeling programs"
+readme = "README.md"
+requires-python = ">=3.8"
+dynamic = ['version', 'dependencies']
+authors = [
+  { name="Daniel Buscombe", email="dbuscombe@gmail.email" },
+]
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/Doodleverse/doodler_engine"
+"Bug Tracker" = "https://github.com/Doodleverse/doodler_engine/issues"
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools-git-versioning]
+enabled = true
+starting_version = "0.0.1"
