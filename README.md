@@ -16,7 +16,7 @@ Run the following commands from this directory:
 ```
 conda create -n doodler_engine_env -c conda-forge --override-channels python=3.8
 conda activate doodler_engine_env
-conda install --file requirements.txt -c conda-forge --override-channels
+conda install --file requirements.txt --file requirements-dev.txt -c conda-forge --override-channels
 pip install -e .
 ```
 
